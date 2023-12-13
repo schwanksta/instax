@@ -19,6 +19,14 @@
   <script src="https://cdn.jsdelivr.net/npm/modern-screenshot@4.4.36/dist/worker.min.js"></script>
 
   <style>
+    @keyframes rotation {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(359deg);
+  }
+}
     @font-face {
       font-family: 'IBMVGA8';
       src: url("fonts/ibm_vga8.woff2") format("woff2");
@@ -169,7 +177,8 @@
     canvas2d.height = $story.clientHeight;
 
     var recorder = new RecordRTC(canvas2d, {
-        type: 'canvas'
+        type: 'canvas',
+        frameRate: 60
     });      
     var isRecordingStarted = false;
     var isStoppedRecording = false;
@@ -177,11 +186,10 @@
 
     (function looper() {
         if(!isRecordingStarted) {
-            return setTimeout(looper, 20);
+            return setTimeout(looper, 10);
         }
 
-        html2canvas($story).then(function(canvas) {
-          console.log("recording...!!!!!")
+        modernScreenshot.domToCanvas($story, { scale: 2 }).then(function(canvas) {
             context.clearRect(0, 0, canvas2d.width, canvas2d.height);
             context.drawImage(canvas, 0, 0, canvas2d.width, canvas2d.height);
 
@@ -238,7 +246,7 @@
     }
 
     document.querySelector("#save-image").addEventListener("click", (event) => {
-      modernScreenshot.domToPng($story).then(dataUrl => {
+      modernScreenshot.domToPng($story, { scale: 2 }).then(dataUrl => {
         const link = document.createElement('a')
         link.download = 'story.png'
         link.href = dataUrl
