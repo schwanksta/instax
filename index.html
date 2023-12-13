@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Instax</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
+
+  <script src="js/ace/ace.min.js" integrity="sha512-5ur89G46zAPpH0kj/TDGeB/csR1UsUNmKUf4GXNmNOwM1SoMA3IJ85jYBoHQnfDLIkfydZtsxxmGpNsY+2plqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script stc ="js/ace/mode-css.js"></script>
+  <script src="js/ace/ext-language_tools.js"></script>
+
+  <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
+  <script src="https://www.webrtc-experiment.com/screenshot.js"></script>
+  <!--<script src="js/gifler.min.js"></script>-->
+
+  <script src="https://cdn.jsdelivr.net/npm/modern-screenshot@4.4.36/dist/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/modern-screenshot@4.4.36/dist/worker.min.js"></script>
+
+  <style>
+    @font-face {
+      font-family: 'IBMVGA8';
+      src: url("fonts/ibm_vga8.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: 'IBM Bios';
+      src: url("fonts/Web437_IBM_BIOS.woff") format("woff");
+    }
+    body { background: lightblue; }
+    #code {
+      width: 90%;
+      height: fit-content;
+      padding: 20px;
+      box-shadow: 0 0 50px 15px #48abe0;
+    }
+
+    details p {
+      margin:0;
+      padding:0;
+      font-style: italic;
+    }
+    details p tt {
+      display:inline;
+    }
+    summary {
+      font-size: 1.3em;
+      font-family: sans-serif;
+      padding: 5px;
+    }
+    #js, #html {
+      width:100%;
+      min-height: 200px;
+      font-size:1.2rem;
+    }
+    #css { 
+      width:100%;
+      height:500px;
+      display:block;
+      font-size:1rem;
+    }
+
+    #wrapper {
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    #buttonwrap {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    button {
+      font-size: 1.5rem;
+    }
+
+    #story { 
+      background: white;
+      height: calc(1920px / 2);
+      width: calc(1080px / 2);
+      border: none;
+      box-shadow: 0 0 50px 15px #48abe0;
+      box-sizing: border-box;
+      padding: 60px 40px;
+      overflow: hidden;
+    }
+
+    #story p, ul, li {
+      font-family: sans-serif;
+      font-size: 2rem;
+      line-height:2.3rem;
+    }
+    #story img {
+      border: 0;
+    }
+    .cache {
+      display:none;
+    }
+
+    @media (max-width: 768px) {
+      #wrapper {
+        grid-template-columns: repeat(1, 1fr);
+      }
+    }
+  </style>
+
+</head>
+<body>
+  <div id="wrapper">
+    <div id="code">
+      <details open="true">
+        <summary>CSS</summary>
+        <div id="css"></div>
+      </details>
+      <details><summary>HTML</summary>
+        <div id="html"></textarea>
+      </details>
+      <details><summary>JS</summary>
+        <p>Use <tt>story</tt> to access elements in story. eg, <tt>story.querySelectorAll("p")</tt></p>
+        <div id="js"></textarea>
+      </details>
+        <div id="buttonwrap">
+          <button id="plus-p">+p</button>
+          <button id="refresh">↻</button>
+          <button id="save-image">🖼️</button>
+          <button id="save-video">🎥</button>
+          <!--<input type='file' id="plus-img" />-->
+        </div>
+    </div>
+
+      <div id="story">
+
+      </div>
+
+  </div>
+
+  <textarea id="css-cache" class="cache"></textarea>
+  <textarea id="html-cache" class="cache"></textarea>
+  <textarea id="js-cache" class="cache"></textarea>
+
+  <canvas id="background-canvas" style="position:absolute; top:-99999999px; left:-9999999999px;"></canvas>
+
+  <script>
+
+    ace.require("ace/ext/language_tools");
+    const css_editor = ace.edit("css", { mode: "ace/mode/css", showGutter: false });
+    css_editor.setOptions({
+      enableBasicAutocompletion: true,
+      enableSnippets: true,
+      enableLiveAutocompletion: true
+    })
+    css_editor.on('change', e => {
+      document.querySelector("#css-cache").value = css_editor.getSession().getValue();
+    })
+
+    const js_editor = ace.edit("js", {mode: "ace/mode/javascript", showGutter: false });
+    js_editor.on('change', e => {
+      document.querySelector("#js-cache").value = js_editor.getSession().getValue();
+    })
+    const html_editor = ace.edit("html", {mode: "ace/mode/html", showGutter: false });
+    html_editor.on('change', e => {
+      document.querySelector("#html-cache").value = html_editor.getSession().getValue();
+    })
+
+    const $story = document.querySelector("#story");
+    var canvas2d = document.getElementById('background-canvas');
+    var context = canvas2d.getContext('2d');
+    canvas2d.width = $story.clientWidth;
+    canvas2d.height = $story.clientHeight;
+
+    var recorder = new RecordRTC(canvas2d, {
+        type: 'canvas'
+    });      
+    var isRecordingStarted = false;
+    var isStoppedRecording = false;
+
+
+    (function looper() {
+        if(!isRecordingStarted) {
+            return setTimeout(looper, 20);
+        }
+
+        html2canvas($story).then(function(canvas) {
+          console.log("recording...!!!!!")
+            context.clearRect(0, 0, canvas2d.width, canvas2d.height);
+            context.drawImage(canvas, 0, 0, canvas2d.width, canvas2d.height);
+
+            if(isStoppedRecording) {
+                return;
+            }
+
+            requestAnimationFrame(looper);
+        });
+    })();
+
+
+
+    document.querySelector("#save-video").addEventListener("click", (event) => {
+
+      if(!isRecordingStarted) {
+        recorder.startRecording();
+        isStoppedRecording = false;
+        isRecordingStarted = true;
+      }
+
+      else{
+        recorder.stopRecording(function() {
+          isRecordingStarted = false;
+          isStoppedRecording = true;
+
+          recorder.recording = false;
+          const blob = recorder.getBlob();
+          let a = document.createElement("a");
+          // download file name
+          a.download = "story.webm";
+          // download file data
+          a.href = URL.createObjectURL(blob);
+          a.target = "_blank";
+          // start download
+          a.click();
+        });
+      }
+    })
+
+
+    function fromHTML(html, trim = true) {
+      // Process the HTML string.
+      html = trim ? html : html.trim();
+      if (!html) return null;
+
+      // Then set up a new template element.
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      const result = template.content.children;
+      console.log(result)
+
+      return result;
+    }
+
+    document.querySelector("#save-image").addEventListener("click", (event) => {
+      modernScreenshot.domToPng($story).then(dataUrl => {
+        const link = document.createElement('a')
+        link.download = 'story.png'
+        link.href = dataUrl
+        link.click()
+      })
+    });
+
+    document.querySelector("#refresh").addEventListener("click", (event) => {
+
+      // Check to see if we have a style object for the css
+      const existing_style = document.querySelector("#story-css")
+      const css = css_editor.getSession().getValue()
+      // create a style element if we need one
+      const style = existing_style || document.createElement('style');
+
+      style.setAttribute("id", "story-css");
+
+      // add the CSS as a string using template literals
+      style.replaceChildren(document.createTextNode(`
+        #story { 
+          ${css}
+        }`
+      ));
+
+      // add the style to the head
+      const head = document.getElementsByTagName('head')[0];
+      head.appendChild(style);
+
+      // Get the JS and eval the thing
+      const js = js_editor.getSession().getValue()
+      // Eval!
+      eval(js);
+
+      // Check to see if we have any added elements already and remove them
+      document.querySelectorAll("#story > *").forEach(e => e.remove());
+      const html = html_editor.getSession().getValue();
+      // Create HTML elements and append them as children to #story
+      const children = fromHTML(html);
+      if(children) {
+        Array.from(children).forEach( e => { 
+          document.querySelector("#story").appendChild(e);
+          e.addEventListener("mousedown", onDrag);
+          if(e.nodeName == "P") {
+            e.spellCheck = "false";
+            e.contentEditable ="true";
+          }
+        });
+      }
+    });
+
+
+    function onDrag(event) {
+      let target = event.target;
+      target.style.position = "relative"
+      target.focus();
+      if(target.tagName == 'IMG') {
+        event.preventDefault();
+      }
+      
+      function onMove(event) {
+        let originalStyles = window.getComputedStyle(target)
+        target.style.left = parseInt(originalStyles.left) + event.movementX + 'px'
+        target.style.top = parseInt(originalStyles.top) + event.movementY + 'px'
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', (event) => {
+        document.removeEventListener("mousemove", onMove);
+      });
+
+    }
+
+    //document.querySelector("#story p").addEventListener("mousedown", onDrag);
+
+    document.querySelector("#plus-p").addEventListener("click", (event) => {
+      const p = document.createElement("p");
+      p.spellCheck = "false";
+      p.contentEditable ="true";
+      p.innerHTML = "Talk to me."
+      p.addEventListener("mousedown", onDrag);
+      $story.appendChild(p);
+    });
+
+    [css_editor, html_editor, js_editor].forEach( (e, i) => {
+     e.getSession().setValue(document.querySelectorAll("textarea.cache")[i].value)
+    })
+
+    // For dropping images in
+    $story.addEventListener("drop", (event) => {
+        // Prevent default behavior (Prevent file from being opened)
+        event.preventDefault();
+
+        if (event.dataTransfer.items) {
+          // Use DataTransferItemList interface to access the file(s)
+          [...event.dataTransfer.items].forEach((item, i) => {
+            // If dropped items aren't files, reject them
+            if (item.kind === "file") {
+              const file = item.getAsFile();
+              console.log(file)
+              console.log(`… file[${i}].name = ${file.name}`);
+              var reader  = new FileReader();
+              // it's onload event and you forgot (parameters)
+              reader.onload = function(e)  {
+                  var image = document.createElement("img");
+                  // the result image data
+                  image.src = e.target.result;
+                  image.addEventListener("mousedown", onDrag);
+                  document.querySelector("#story").appendChild(image);
+               }
+               // you have to declare the file loading
+               reader.readAsDataURL(file);
+            }
+          });
+        } else {
+          // Use DataTransfer interface to access the file(s)
+          [...event.dataTransfer.files].forEach((file, i) => {
+            console.log(`… file[${i}].name = ${file.name}`);
+          });
+        }
+    });
+
+    function format(html) {
+        var tab = '';
+        var result = '';
+        var indent= '';
+
+        html.split(/>\s*</).forEach(function(element) {
+            if (element.match( /^\/\w/ )) {
+                indent = indent.substring(tab.length);
+            }
+
+            result += indent + '<' + element + '>\r\n';
+
+            if (element.match( /^<?\w[^>]*[^\/]$/ ) && !element.startsWith("input")  ) { 
+                indent += tab;              
+            }
+        });
+
+        return result.substring(1, result.length-3);
+    }
+
+    // Watch the #story div for changes and sync the innerHTML 
+    // to the HTML cache.
+    var observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        html_editor.getSession().setValue(format($story.innerHTML.trim()));
+        $story.querySelectorAll("p", (e) => {
+          setTimeout(() => e.target.focus(), 0);
+        })
+      });
+    });
+    var config = { attributes: true, childList: true, characterData: true, subtree:true };
+    observer.observe($story, config);
+
+    document.querySelector("#refresh").click();
+  </script>
+
+
+</body>
+</html>
