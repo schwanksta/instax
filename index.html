@@ -118,9 +118,12 @@
     <div id="code">
       <details open="true">
         <summary>CSS</summary>
+          <p>The CSS is scoped to <tt>#story</tt>, the instagram story div. To style child elements, use the & syntax, eg <tt>&ldquo;& p { color: red }&rdquo;</tt> </p>
+
         <div id="css"></div>
       </details>
       <details><summary>HTML</summary>
+        <p>The HTML will update any time you drag or edit elements in the story. You can edit it directly and hit ↻ to send it to the story.</p>
         <div id="html"></textarea>
       </details>
       <details><summary>JS</summary>
@@ -128,10 +131,10 @@
         <div id="js"></textarea>
       </details>
         <div id="buttonwrap">
-          <button id="plus-p">+p</button>
-          <button id="refresh">↻</button>
-          <button id="save-image">📷</button>
-          <button id="save-video">🎥</button>
+          <button id="plus-p" title="New paragraph">¶</button>
+          <button id="refresh" title="Refresh story">↻</button>
+          <button id="save-image" title="Save image">📷</button>
+          <button id="save-video" title="Save video">🎥</button>
           <!--<input type='file' id="plus-img" />-->
         </div>
     </div>
